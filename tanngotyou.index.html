@@ -1,0 +1,420 @@
+<!DOCTYPE html>
+<html lang="ja">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
+<title>最強の単語帳</title>
+<script src="https://unpkg.com/dexie/dist/dexie.js"></script>
+<script src="https://unpkg.com/papaparse/papaparse.min.js"></script>
+<link href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.0.0/css/all.min.css" rel="stylesheet">
+
+<style>
+    body { margin: 0; padding: 0; font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, sans-serif; background: #f0f2f5; height: 100vh; display: flex; flex-direction: column; overflow: hidden; color: #333; }
+    
+    .screen { display: none; flex-direction: column; height: 100%; width: 100%; }
+    .active { display: flex; }
+
+    /* 設定画面 */
+    #setup-screen { justify-content: center; align-items: center; padding: 20px; text-align: center; }
+    .upload-box { border: 2px dashed #ccc; padding: 30px; border-radius: 10px; background: white; margin-bottom: 20px; }
+    
+    /* ヘッダー */
+    #header { padding: 10px 15px; background: white; border-bottom: 1px solid #e0e0e0; display: flex; justify-content: space-between; align-items: center; height: 50px; }
+    .status-badge { background: #e8f5e9; color: #2e7d32; padding: 4px 10px; border-radius: 15px; font-size: 0.8rem; font-weight: bold; }
+    
+    /* カードエリア */
+    #card-container { flex: 1; position: relative; padding: 15px; display: flex; justify-content: center; align-items: center; }
+    
+    #card {
+        width: 100%; max-width: 600px; height: 100%; max-height: 70vh;
+        background: white; border-radius: 16px;
+        box-shadow: 0 10px 25px rgba(0,0,0,0.08);
+        display: flex; flex-direction: column;
+        position: relative; overflow: hidden; transition: transform 0.1s;
+    }
+
+    .card-content { flex: 1; padding: 30px; overflow-y: auto; display: flex; flex-direction: column; align-items: center; justify-content: center; text-align: center; }
+    
+    .level-badge { position: absolute; top: 15px; left: 15px; font-size: 0.75rem; color: #aaa; border: 1px solid #eee; padding: 2px 8px; border-radius: 4px; }
+    .shortcut-hint { position: absolute; bottom: 10px; right: 15px; font-size: 0.7rem; color: #ccc; display: none; }
+    /* PCのみショートカットヒントを表示 */
+    @media (min-width: 768px) { .shortcut-hint { display: block; } }
+
+    .q-text { font-size: 1.8rem; font-weight: bold; margin-bottom: 20px; color: #222; width: 100%; line-height: 1.4; }
+    
+    .answer-area { width: 100%; display: none; border-top: 1px solid #f0f0f0; padding-top: 20px; margin-top: 20px; animation: fadeIn 0.2s ease; }
+    .a-text { font-size: 1.5rem; color: #d32f2f; font-weight: bold; margin-bottom: 8px; }
+    .r-text { font-size: 1.1rem; color: #666; }
+
+    @keyframes fadeIn { from { opacity: 0; transform: translateY(5px); } to { opacity: 1; transform: translateY(0); } }
+
+    /* コントロールボタン (十字キー配置を意識したレイアウト) */
+    #controls { height: 140px; padding: 10px; background: white; box-shadow: 0 -2px 10px rgba(0,0,0,0.05); display: flex; flex-direction: column; justify-content: center; align-items: center; gap: 5px; }
+    
+    .control-row { display: flex; gap: 10px; width: 100%; max-width: 500px; justify-content: center; }
+    .btn { flex: 1; border: none; border-radius: 12px; font-weight: bold; font-size: 1rem; cursor: pointer; display: flex; flex-direction: column; justify-content: center; align-items: center; height: 50px; transition: 0.1s; box-shadow: 0 2px 5px rgba(0,0,0,0.1); }
+    .btn:active, .btn.active-key { transform: scale(0.96); filter: brightness(0.9); }
+    .btn small { font-size: 0.7rem; font-weight: normal; margin-left: 5px; }
+
+    /* 色設定 */
+    .btn-understand { background: #e8f5e9; color: #1b5e20; width: 100%; } /* 上 */
+    .btn-unknown { background: #fff3e0; color: #e65100; width: 100%; } /* 下 */
+    .btn-later { background: #f1f3f4; color: #5f6368; } /* 左 */
+    .btn-known { background: #e3f2fd; color: #0d47a1; } /* 右 */
+
+    /* オーバーレイ */
+    #overlay { 
+        position: absolute; top: 0; left: 0; width: 100%; height: 100%; 
+        background: rgba(255,255,255,0.95); z-index: 100;
+        display: none; flex-direction: column; justify-content: center; align-items: center; 
+        text-align: center; padding: 20px;
+    }
+    .big-btn { background: #2196f3; color: white; border: none; padding: 15px 40px; border-radius: 30px; font-size: 1.2rem; font-weight: bold; cursor: pointer; margin-top: 10px; }
+    .sub-btn { background: none; border: none; color: #666; margin-top: 20px; text-decoration: underline; cursor: pointer; }
+
+</style>
+</head>
+<body>
+
+    <div id="setup-screen" class="screen">
+        <h2>📚 単語帳セットアップ</h2>
+        <div class="upload-box">
+            <p>CSVファイルを選択してください</p>
+            <input type="file" id="csv-file" accept=".csv" />
+            <p style="font-size:0.8rem; color:#888;">形式: 問題, 答え, 読み</p>
+        </div>
+    </div>
+
+    <div id="study-screen" class="screen">
+        <div id="header">
+            <span class="status-badge" id="progress-text">準備中...</span>
+            <button onclick="resetData()" style="background:none; border:none; color:#999; cursor:pointer;">リセット</button>
+        </div>
+
+        <div id="card-container">
+            <div id="card">
+                <span class="level-badge" id="lvl-badge">Lv.0</span>
+                <span class="shortcut-hint">Enter:解答/開始 | 矢印:操作</span>
+                <button onclick="copyCardContent()" style="position:absolute; top:15px; right:15px; border:none; background:none; cursor:pointer; color:#ccc;"><i class="fa-regular fa-copy"></i></button>
+
+                <div class="card-content">
+                    <div class="q-text" id="q-text"></div>
+                    <div class="answer-area" id="a-area">
+                        <div class="a-text" id="a-text"></div>
+                        <div class="r-text" id="r-text"></div>
+                    </div>
+                </div>
+            </div>
+
+            <div id="overlay">
+                <h2 id="overlay-msg"></h2>
+                <button class="big-btn" id="overlay-btn" onclick="startSession()">学習スタート</button>
+                <button class="sub-btn" id="overlay-sub-btn" onclick="addMore()">追加で30問やる</button>
+            </div>
+        </div>
+
+        <div id="controls">
+            <div class="control-row">
+                <button class="btn btn-understand" id="btn-understand" onclick="clickUnderstand()">
+                    <span><i class="fa-solid fa-arrow-up"></i> わかる</span>
+                </button>
+            </div>
+            
+            <div class="control-row">
+                <button class="btn btn-later" id="btn-later" onclick="clickLater()">
+                    <span><i class="fa-solid fa-arrow-left"></i> 後回し</span>
+                </button>
+                <button class="btn btn-known" id="btn-known" onclick="clickKnown()">
+                    <span>知ってる <i class="fa-solid fa-arrow-right"></i></span>
+                </button>
+            </div>
+
+            <div class="control-row">
+                <button class="btn btn-unknown" id="btn-unknown" onclick="clickUnknown()">
+                    <span><i class="fa-solid fa-arrow-down"></i> わからない</span>
+                </button>
+            </div>
+        </div>
+    </div>
+
+<script>
+    const db = new Dexie("FlashcardApp_v2");
+    db.version(1).stores({ questions: "++id, status, nextReview, order" });
+
+    let studyQueue = [];
+    let currentCard = null;
+    let isAnswerShown = false;
+    let isSessionActive = false;
+
+    window.onload = async () => {
+        checkMidnightReset();
+        const count = await db.questions.count();
+        if (count > 0) {
+            switchScreen('study-screen');
+            showOverlay("学習を始めましょう", "スタート", false);
+        } else {
+            switchScreen('setup-screen');
+        }
+    };
+
+    // --- キーボード操作 ---
+    document.addEventListener('keydown', (e) => {
+        // 画面が表示されていない時は無効
+        if (document.getElementById('study-screen').style.display === 'none') return;
+
+        // オーバーレイが出ている場合、Enterでスタート
+        const overlay = document.getElementById('overlay');
+        if (overlay.style.display !== 'none') {
+            if (e.key === 'Enter') {
+                e.preventDefault();
+                // 表示されているボタンに応じて動作
+                if (document.getElementById('overlay-btn').innerText === "スタート") {
+                    startSession();
+                } else if (document.getElementById('overlay-btn').innerText === "学習スタート") {
+                    startSession();
+                } else {
+                    // 完了画面などの場合、追加ボタンがあればそちらを優先等のロジックも可だが
+                    // 基本はスタートボタンを押す挙動にする
+                    document.getElementById('overlay-btn').click();
+                }
+            }
+            return;
+        }
+
+        // 学習中
+        switch(e.key) {
+            case 'Enter':
+                e.preventDefault();
+                if (!isAnswerShown) {
+                    showAnswer();
+                    highlightButton('card'); // 視覚フィードバック用（任意）
+                }
+                break;
+            case 'ArrowUp': // わかる
+                e.preventDefault();
+                highlightButton('btn-understand');
+                clickUnderstand();
+                break;
+            case 'ArrowDown': // わからない
+                e.preventDefault();
+                highlightButton('btn-unknown');
+                clickUnknown();
+                break;
+            case 'ArrowLeft': // 後回し
+                e.preventDefault();
+                highlightButton('btn-later');
+                clickLater();
+                break;
+            case 'ArrowRight': // 知ってる
+                e.preventDefault();
+                highlightButton('btn-known');
+                clickKnown();
+                break;
+        }
+    });
+
+    function highlightButton(id) {
+        if(id === 'card') return; 
+        const btn = document.getElementById(id);
+        btn.classList.add('active-key');
+        setTimeout(() => btn.classList.remove('active-key'), 150);
+    }
+
+    // --- ロジック ---
+
+    // 抽出ロジックの修正版（Order優先）
+    async function getNewQuestions(count) {
+        // status=0 のものを order順（昇順）で取得
+        // Dexieで複合インデックスがない場合、Collectionを使用
+        return await db.questions
+            .orderBy('order')
+            .filter(item => item.status === 0)
+            .limit(count)
+            .toArray();
+    }
+
+    async function startSession() {
+        hideOverlay();
+        document.getElementById('progress-text').innerText = "準備中...";
+        const now = Date.now();
+        
+        // 1. 復習
+        const reviews = await db.questions.where('status').equals(1).filter(i => i.nextReview <= now).toArray();
+        
+        // 2. 新規 (不足分を補充)
+        let needed = Math.max(0, 30 - reviews.length);
+        // ★修正: Order順で取得するため、後回し(Order大)は選ばれない
+        const news = (needed > 0) ? await getNewQuestions(needed) : [];
+
+        studyQueue = [...reviews, ...news]; // 復習優先、その後新規
+        
+        // ※ここではシャッフルせず、復習→新規の順で出すか、混ぜるか。
+        // 一般的には混ぜたほうがいいのでシャッフルします。
+        studyQueue.sort(() => Math.random() - 0.5);
+
+        if (studyQueue.length === 0) {
+            showOverlay("現在、復習すべき問題はありません", "閉じる", true);
+            return;
+        }
+        isSessionActive = true;
+        loadNextCard();
+    }
+
+    async function addMore() {
+        // ★修正: 追加分もOrder順で取得
+        const moreNews = await getNewQuestions(30);
+        if (moreNews.length === 0) {
+            alert("新規問題はもうありません！"); return;
+        }
+        studyQueue = moreNews;
+        hideOverlay();
+        isSessionActive = true;
+        loadNextCard();
+    }
+
+    // カード表示
+    function loadNextCard() {
+        if (studyQueue.length === 0) {
+            completeSession(); return;
+        }
+        currentCard = studyQueue[0];
+        isAnswerShown = false;
+
+        document.getElementById('q-text').innerText = currentCard.question;
+        document.getElementById('a-text').innerText = currentCard.answer;
+        document.getElementById('r-text').innerText = currentCard.reading || "";
+        document.getElementById('lvl-badge').innerText = `Lv.${currentCard.reviewCount || 0}`;
+        document.getElementById('a-area').style.display = 'none';
+        
+        // ボタンラベルのリセット
+        document.getElementById('btn-unknown').innerHTML = '<span><i class="fa-solid fa-arrow-down"></i> わからない</span>';
+        document.getElementById('btn-understand').innerHTML = '<span><i class="fa-solid fa-arrow-up"></i> わかる</span>';
+
+        updateCount();
+    }
+
+    // --- アクション ---
+
+    // 後回し修正：全データの最後尾へ
+    async function clickLater() {
+        if (!isSessionActive) return;
+        // DB全体で一番大きなOrderを取得し、さらに加算
+        const lastItem = await db.questions.orderBy('order').last();
+        const maxOrder = lastItem ? lastItem.order : 0;
+        
+        // 確実に後ろに行くよう +1000 しておく
+        await db.questions.update(currentCard.id, { order: maxOrder + 1000 });
+
+        studyQueue.shift();
+        loadNextCard();
+    }
+
+    function clickUnknown() {
+        if (!isSessionActive) return;
+        if (!isAnswerShown) {
+            showAnswer();
+            document.getElementById('btn-unknown').innerHTML = '<span><i class="fa-solid fa-arrow-down"></i> もう一度</span>';
+        } else {
+            studyQueue.push(studyQueue.shift()); // 今日のリストの最後へ
+            loadNextCard();
+        }
+    }
+
+    async function clickUnderstand() {
+        if (!isSessionActive) return;
+        if (!isAnswerShown) {
+            showAnswer();
+            document.getElementById('btn-understand').innerHTML = '<span><i class="fa-solid fa-arrow-up"></i> 次へ</span>';
+        } else {
+            // 復習予約
+            const nextTime = Date.now() + (24 * 60 * 60 * 1000);
+            await db.questions.update(currentCard.id, {
+                status: 1,
+                nextReview: nextTime,
+                reviewCount: (currentCard.reviewCount||0) + 1
+            });
+            studyQueue.shift();
+            loadNextCard();
+        }
+    }
+
+    async function clickKnown() {
+        if (!isSessionActive) return;
+        await db.questions.update(currentCard.id, { status: 9 });
+        studyQueue.shift();
+        loadNextCard();
+    }
+
+    function showAnswer() {
+        document.getElementById('a-area').style.display = 'block';
+        isAnswerShown = true;
+    }
+
+    // --- その他 ---
+    function completeSession() {
+        isSessionActive = false;
+        showOverlay("🎉 ノルマ達成！", "明日まで待機", true);
+    }
+    
+    function showOverlay(msg, btnTxt, sub) {
+        document.getElementById('overlay').style.display = 'flex';
+        document.getElementById('overlay-msg').innerText = msg;
+        const btn = document.getElementById('overlay-btn');
+        btn.innerText = btnTxt;
+        if(btnTxt === "明日まで待機") {
+            btn.style.background = "#ccc";
+            btn.onclick = () => location.reload();
+        } else {
+            btn.style.background = "#2196f3";
+            btn.onclick = startSession;
+        }
+        document.getElementById('overlay-sub-btn').style.display = sub ? 'block' : 'none';
+    }
+
+    function hideOverlay() { document.getElementById('overlay').style.display = 'none'; }
+    function switchScreen(id) {
+        document.querySelectorAll('.screen').forEach(e => e.classList.remove('active'));
+        document.getElementById(id).classList.add('active');
+    }
+    function updateCount() { document.getElementById('progress-text').innerText = `残り: ${studyQueue.length}問`; }
+
+    // CSV読み込み
+    document.getElementById('csv-file').addEventListener('change', function(e) {
+        const file = e.target.files[0];
+        if (!file) return;
+        Papa.parse(file, {
+            header: false, skipEmptyLines: true,
+            complete: async function(results) {
+                const rows = results.data;
+                const data = [];
+                let start = (rows[0][0].includes('問題') || rows[0][0].toLowerCase().includes('question')) ? 1 : 0;
+                for (let i = start; i < rows.length; i++) {
+                    if (rows[i].length >= 2) {
+                        data.push({
+                            question: rows[i][0], answer: rows[i][1], reading: rows[i][2] || "",
+                            status: 0, nextReview: 0, reviewCount: 0, order: i // 初期順序はCSV順
+                        });
+                    }
+                }
+                await db.questions.clear();
+                await db.questions.bulkAdd(data);
+                location.reload();
+            }
+        });
+    });
+
+    function checkMidnightReset() {
+        const last = localStorage.getItem('lastDate');
+        const today = new Date().toDateString();
+        if (last !== today) localStorage.setItem('lastDate', today);
+    }
+    async function resetData() {
+        if(confirm("全データを削除しますか？")) { await db.delete(); location.reload(); }
+    }
+    function copyCardContent() {
+        if(!currentCard) return;
+        navigator.clipboard.writeText(`Q:${currentCard.question}\nA:${currentCard.answer} (${currentCard.reading||""})`);
+    }
+</script>
+</body>
+</html>
