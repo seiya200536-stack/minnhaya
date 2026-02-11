@@ -1,136 +1,140 @@
-<html lang="ja"><head>
+<!DOCTYPE html>
+<html lang="ja">
+<head>
     <meta charset="UTF-8">
-    <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
-    <title>早押しクイズ練習 v80 (GitHub対応版)</title>
+    <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no, viewport-fit=cover">
+    <title>みんはや練習アプリ</title>
     <style>
         :root {
             --primary: #3498db; --accent: #e67e22; --star: #f1c40f;
             --bg: #f4f7f6; --text: #333; --panel-bg: #ffffff;
             --danger: #e74c3c; --sub: #95a5a6;
         }
-        body { font-family: -apple-system, BlinkMacSystemFont, sans-serif; background: var(--bg); margin: 0; color: var(--text); padding-bottom: 50px; }
-        nav { background: #2c3e50; padding: 10px; display: flex; justify-content: center; gap: 8px; position: sticky; top: 0; z-index: 100; }
-        nav button { background: none; border: 1px solid #7f8c8d; color: #bdc3c7; padding: 8px 15px; border-radius: 20px; cursor: pointer; font-weight: bold; }
+        html, body {
+            overflow-x: hidden; width: 100%; position: relative;
+            touch-action: pan-y; -webkit-user-select: none; user-select: none;
+            margin: 0; padding: 0; background: var(--bg);
+        }
+        body { 
+            font-family: -apple-system, BlinkMacSystemFont, sans-serif; 
+            color: var(--text); padding-bottom: 80px; box-sizing: border-box;
+        }
+        nav { 
+            background: #2c3e50; padding: calc(env(safe-area-inset-top) + 10px) 10px 10px 10px;
+            display: flex; justify-content: center; gap: 8px; width: 100%; box-sizing: border-box; 
+            box-shadow: 0 2px 5px rgba(0,0,0,0.2);
+        }
+        nav button { background: none; border: 1px solid #7f8c8d; color: #bdc3c7; padding: 6px 14px; border-radius: 20px; cursor: pointer; font-weight: bold; outline: none; font-size: 0.9rem;}
         nav button.active { background: white; color: #2c3e50; border-color: white; }
-        .container { width: 92%; max-width: 600px; margin: 20px auto; background: white; padding: 20px; border-radius: 12px; display: none; box-shadow: 0 2px 10px rgba(0,0,0,0.1); }
+        .container { 
+            width: 95%; max-width: 600px; margin: 10px auto; background: white; padding: 15px; 
+            border-radius: 12px; display: none; box-shadow: 0 2px 10px rgba(0,0,0,0.1); 
+            box-sizing: border-box; outline: none; 
+        }
         .container.active { display: block; }
+        .review-header { 
+            position: sticky; top: 0; background: white; z-index: 900; padding: 10px 15px; 
+            margin: -15px -15px 10px -15px; border-bottom: 2px solid #f4f7f6; 
+            display: flex; justify-content: space-between; align-items: center; border-radius: 12px 12px 0 0;
+        }
         .btn { width: 100%; padding: 15px; border-radius: 8px; border: none; font-weight: bold; font-size: 1rem; cursor: pointer; margin-top: 10px; }
+        .btn:disabled { background: #ccc !important; color: #999; cursor: not-allowed; }
         .btn-main { background: var(--primary); color: white; }
         .btn-accent { background: var(--accent); color: white; }
-        .btn-star { background: #ddd; color: white; font-size: 1.5rem; width: 80px; }
-        #question-display { font-size: 1.4rem; min-height: 120px; line-height: 1.6; margin-bottom: 20px; border-bottom: 1px solid #eee; padding-bottom: 10px; word-break: break-all; }
-        .footer-area { background: #f9f9f9; padding: 15px; border-radius: 10px; margin-top: 10px; }
-        .review-item { border-bottom: 1px solid #eee; padding: 15px 0; }
-        .review-q { font-size: 0.95rem; margin-bottom: 8px; line-height: 1.4; color: #555; }
-        .review-bottom-row { display: flex; align-items: center; justify-content: space-between; gap: 10px; }
-        .rev-ans-box { flex-grow: 1; min-height: 1.2rem; }
+        .btn-star { background: #ddd; color: white; font-size: 1.5rem; width: 60px; }
+        .btn-copy-main { background: #7f8c8d; color: white; font-size: 0.9rem; width: 80px; }
+        #question-display { font-size: 1.4rem; min-height: 100px; line-height: 1.6; margin-bottom: 15px; border-bottom: 1px solid #eee; padding-bottom: 10px; word-break: break-all; }
+        .review-item { border-bottom: 1px solid #eee; padding: 12px 5px; cursor: pointer; transition: transform 0.2s, opacity 0.2s; position: relative; }
+        .review-q { font-size: 0.95rem; margin-bottom: 8px; line-height: 1.4; color: #555; padding-right: 30px;}
+        .review-bottom-row { display: flex; align-items: center; justify-content: space-between; gap: 10px; pointer-events: none; }
         .rev-ans { color: var(--danger); font-weight: bold; font-size: 1.1rem; }
-        .rev-controls { display: flex; gap: 5px; flex-shrink: 0; }
+        .rev-controls { display: flex; gap: 5px; pointer-events: auto; }
         .btn-sm { padding: 6px 12px; border-radius: 4px; border: none; font-size: 0.8rem; font-weight: bold; cursor: pointer; }
+        .btn-copy-sm { background: #eee; color: #666; font-size: 0.75rem; padding: 4px 8px; border-radius: 4px; border: 1px solid #ddd; }
         .hidden { display: none !important; }
     </style>
 </head>
-<body contenteditable="false">
+<body id="app-body" tabindex="0">
 
 <nav>
-    <button id="btn-nav-setup" onclick="showScreen('setup')" class="active">設定</button>
-    <button id="btn-nav-quiz" onclick="showScreen('quiz')" class="">クイズ</button>
-    <button id="btn-nav-review" onclick="showScreen('review')" class="">復習</button>
+    <button id="nav-setup" onclick="showScreen('setup')">設定</button>
+    <button id="nav-quiz" onclick="showScreen('quiz')">クイズ</button>
+    <button id="nav-review" onclick="showScreen('review')">復習</button>
 </nav>
 
 <div id="screen-setup" class="container active">
-    <h3>📂 設定</h3>
-    <div id="status" style="margin-bottom: 15px; padding: 15px; border-radius: 8px; background: rgb(212, 237, 218); text-align: center; font-weight: bold; color: rgb(21, 87, 36);">保存完了: 17275件</div>
-    
-    <input type="file" accept=".csv" onchange="loadCSV(this)" style="width:100%; margin-bottom:20px;">
-    
-    <button class="btn btn-main" id="start-btn" onclick="initQuiz()">練習開始 (Enter)</button>
-    
+    <h3 style="margin-top:0;">📂 設定</h3>
+    <div id="status" style="margin-bottom:15px; padding:15px; border-radius:8px; background:#dfe6e9; text-align:center; font-weight:bold;">データを読み込んでください</div>
+    <input type="file" id="csv-file" accept=".csv" onchange="loadCSV(this)" style="width:100%; margin-bottom:20px;">
+    <button class="btn btn-main" id="start-btn" onclick="initQuiz()" disabled>練習開始 (Enter)</button>
     <div style="margin-top:30px; border-top:1px solid #eee; padding-top:20px;">
         <button class="btn btn-accent" onclick="exportAppHTML()">埋め込み済みHTMLを保存</button>
-        <button onclick="clearSystemData()" style="margin-top:20px; background:none; border:none; color:var(--sub); cursor:pointer; font-size:0.8rem; text-decoration:underline; width:100%;">ブラウザの保存データを全削除</button>
+        <button onclick="clearSystemData()" style="margin-top:20px; background:none; border:none; color:var(--sub); cursor:pointer; font-size:0.8rem; text-decoration:underline; width:100%;">全データ削除</button>
     </div>
 </div>
 
 <div id="screen-quiz" class="container">
-    <div style="display:flex; justify-content:space-between; font-size:0.8rem; color:#999;">
-        <span id="info-count">第 1 問</span>
-        <span id="info-rest">残: 17274</span>
+    <div style="display:flex; justify-content:space-between; font-size:0.8rem; color:#999; margin-bottom:5px;">
+        <span id="info-count">第 - 問</span>
+        <span id="info-rest">残: -</span>
     </div>
-    <div id="question-display">競馬で、日本ダービーは東京競馬場で開催されますが、東京ダービーは何競馬場で開催されるでしょう？</div>
+    <div id="question-display"></div>
     <button id="reveal-btn" class="btn btn-main" onclick="doReveal()">解答表示 (Enter)</button>
     <div id="quiz-footer" class="hidden">
-        <div class="footer-area">
+        <div class="footer-area" style="background:#f9f9f9; padding:15px; border-radius:10px; margin-bottom:10px; position:relative;">
             <div id="ans-text" style="color:var(--danger); font-size:1.4rem; font-weight:bold; text-align:center;"></div>
-            <div id="ans-yomi" style="color:#666; text-align:center; font-size:0.9rem;"></div>
+            <div id="ans-yomi" style="color:#666; text-align:center; font-size:0.8rem;"></div>
         </div>
-        <div style="display:flex; gap:10px;">
-            <button id="star-btn" class="btn btn-star" onclick="toggleFav()" style="background: rgb(221, 221, 221);">☆</button>
-            <button id="next-btn" class="btn btn-main" style="background:#2ecc71; flex:1;" onclick="doNext()">次へ (Enter)</button>
+        <div style="display:flex; gap:8px;">
+            <button id="star-btn" class="btn btn-star" onclick="toggleFav()">☆</button>
+            <button id="copy-btn-quiz" class="btn btn-copy-main" onclick="copyCurrentQuiz()">コピー</button>
+            <button id="next-btn" class="btn btn-main" style="background:#2ecc71; flex:1; margin-top:10px;" onclick="doNext()">次へ (Enter)</button>
         </div>
     </div>
 </div>
 
 <div id="screen-review" class="container">
-    <div style="display:flex; justify-content:space-between; align-items:center;">
-        <h3>★ 復習帳</h3>
-        <button id="bulk-toggle-btn" onclick="toggleAllReview()" style="padding:8px 12px; cursor:pointer; background:#34495e; color:white; border:none; border-radius:5px;">全表示/隠す (Enter)</button>
+    <div class="review-header">
+        <h3 style="margin:0; font-size: 1.1rem;">★ 復習帳 <span id="review-count" style="font-size:0.8rem; color:var(--sub); font-weight:normal;">(0)</span></h3>
+        <button id="bulk-toggle-btn" onclick="toggleAllReview()" style="padding:8px 12px; cursor:pointer; background:#34495e; color:white; border:none; border-radius:5px; font-weight:bold;">全て表示</button>
     </div>
-    <div id="review-list"><p style="text-align:center;color:#999;margin-top:20px;">お気に入りはありません</p></div>
+    <div id="review-list"></div>
 </div>
 
 <script>
-    // 起動時にLocalStorageを確認。なければ埋め込みデータ、それもなければ空。
     let savedQuizData = []; 
-    
     const KEY_BASE_DATA = "quiz_system_data";
     const KEY_FAV = "quiz_fav_list";
-
     let quizQueue = [], qIdx = 0, isShowing = false, timer = null;
+    let currentScreen = 'setup';
+    let isAllRevealed = false; 
+
+    const KEY_DATA = localStorage.getItem(KEY_BASE_DATA);
+    if (KEY_DATA) savedQuizData = JSON.parse(KEY_DATA);
+    else if (typeof embeddedData !== 'undefined') savedQuizData = embeddedData;
 
     window.onload = () => {
-        // 1. まずLocalStorageからデータを復旧
-        const localData = localStorage.getItem(KEY_BASE_DATA);
-        if (localData) {
-            savedQuizData = JSON.parse(localData);
-        }
-        
-        // 2. Localにない場合のみ、埋め込まれているデータを使う
-        // (埋め込みデータが存在するかはJSの変数定義で判定)
-        if (savedQuizData.length === 0 && typeof embeddedData !== 'undefined') {
-            savedQuizData = embeddedData;
-        }
-
-        if (savedQuizData.length > 0) {
-            updateStatusText(`データ保存済み: ${savedQuizData.length}件`);
+        if (savedQuizData && savedQuizData.length > 0) {
+            updateStatusText(`データ読み込み済み: ${savedQuizData.length}件`);
             document.getElementById('start-btn').disabled = false;
         }
+        showScreen('setup');
     };
 
     function updateStatusText(txt) {
         const s = document.getElementById('status');
-        s.textContent = txt;
-        s.style.background = "#d4edda"; s.style.color = "#155724";
+        if(s) { s.textContent = txt; s.style.background = "#d4edda"; s.style.color = "#155724"; }
     }
 
     function showScreen(name) {
+        currentScreen = name;
         document.querySelectorAll('.container').forEach(c => c.classList.remove('active'));
         document.querySelectorAll('nav button').forEach(b => b.classList.remove('active'));
         document.getElementById('screen-' + name).classList.add('active');
-        document.getElementById('btn-nav-' + name).classList.add('active');
+        document.getElementById('nav-' + name).classList.add('active');
         if(name === 'review') renderReview();
-    }
-
-    function getFavs() {
-        const stored = localStorage.getItem(KEY_FAV);
-        return stored ? JSON.parse(stored) : [];
-    }
-
-    function saveFav(questionText, isAdd) {
-        let favs = getFavs();
-        if (isAdd) { if (!favs.includes(questionText)) favs.push(questionText); }
-        else { favs = favs.filter(t => t !== questionText); }
-        localStorage.setItem(KEY_FAV, JSON.stringify(favs));
+        window.scrollTo(0,0);
+        document.getElementById('app-body').focus();
     }
 
     function loadCSV(input) {
@@ -143,37 +147,21 @@
                 const c = l.split(',');
                 return { q: c[0]||"", a: c[1]||"", y: c[2]||"" };
             });
-            
-            // 読み込んだらLocalStorageに即保存（これがGitHub対策）
-            try {
-                localStorage.setItem(KEY_BASE_DATA, JSON.stringify(savedQuizData));
-                updateStatusText(`保存完了: ${savedQuizData.length}件`);
-            } catch(e) {
-                alert("ブラウザの容量上限を超えたため、次回は再読み込みが必要です。");
-                updateStatusText(`一時読み込み: ${savedQuizData.length}件`);
-            }
+            localStorage.setItem(KEY_BASE_DATA, JSON.stringify(savedQuizData));
+            updateStatusText(`読込完了: ${savedQuizData.length}件`);
             document.getElementById('start-btn').disabled = false;
         };
         reader.readAsText(file);
     }
 
-    function clearSystemData() {
-        if(confirm("保存されているデータを全て削除しますか？")) {
-            localStorage.clear();
-            location.reload();
-        }
-    }
-
     function initQuiz() {
-        if(savedQuizData.length === 0) return;
+        if(!savedQuizData || savedQuizData.length === 0) return;
         quizQueue = [...savedQuizData].sort(() => Math.random() - 0.5);
-        qIdx = 0;
-        showScreen('quiz');
-        loadQuestion();
+        qIdx = 0; showScreen('quiz'); loadQuestion();
     }
 
     function loadQuestion() {
-        if (qIdx >= quizQueue.length) { alert("全問終了しました"); showScreen('setup'); return; }
+        if (qIdx >= quizQueue.length) { alert("終了"); showScreen('setup'); return; }
         isShowing = false;
         const data = quizQueue[qIdx];
         document.getElementById('info-count').textContent = `第 ${qIdx + 1} 問`;
@@ -190,8 +178,8 @@
         if(timer) clearInterval(timer);
         let charIdx = 0;
         timer = setInterval(() => {
-            if(charIdx < data.q.length) { display.textContent += data.q[charIdx++]; }
-            else { clearInterval(timer); }
+            if(charIdx < data.q.length) display.textContent += data.q[charIdx++];
+            else clearInterval(timer);
         }, 60);
     }
 
@@ -210,110 +198,168 @@
 
     function toggleFav() {
         const data = quizQueue[qIdx];
+        const favs = getFavs();
+        const isAdd = !favs.includes(data.q);
+        saveFav(data.q, isAdd);
         const sBtn = document.getElementById('star-btn');
-        const isCurrentlyFav = sBtn.textContent === "★";
-        saveFav(data.q, !isCurrentlyFav);
-        sBtn.textContent = isCurrentlyFav ? "☆" : "★";
-        sBtn.style.background = isCurrentlyFav ? "#ddd" : "var(--star)";
+        sBtn.textContent = isAdd ? "★" : "☆";
+        sBtn.style.background = isAdd ? "var(--star)" : "#ddd";
+    }
+
+    function copyCurrentQuiz() {
+        const data = quizQueue[qIdx];
+        const yomi = data.y ? ` (${data.y})` : "";
+        const text = `${data.q} / ${data.a}${yomi}`;
+        copyText(text, document.getElementById('copy-btn-quiz'));
+    }
+
+    async function copyText(text, btn) {
+        try {
+            await navigator.clipboard.writeText(text);
+            const oldTxt = btn.textContent;
+            btn.textContent = "OK!";
+            setTimeout(() => btn.textContent = oldTxt, 1000);
+        } catch (err) { alert("コピー失敗"); }
+    }
+
+    function getFavs() {
+        const stored = localStorage.getItem(KEY_FAV);
+        return stored ? JSON.parse(stored) : [];
+    }
+
+    function saveFav(questionText, isAdd) {
+        let favs = getFavs();
+        if (isAdd) { if (!favs.includes(questionText)) favs.push(questionText); }
+        else { favs = favs.filter(t => t !== questionText); }
+        localStorage.setItem(KEY_FAV, JSON.stringify(favs));
     }
 
     function renderReview() {
         const list = document.getElementById('review-list');
         list.innerHTML = "";
         const favs = getFavs();
-        if(!favs.length) { list.innerHTML = "<p style='text-align:center;color:#999;margin-top:20px;'>お気に入りはありません</p>"; return; }
-
+        document.getElementById('review-count').textContent = `(${favs.length})`;
+        if(!favs.length) { list.innerHTML = "<p style='text-align:center;color:#999;padding:20px;'>空です</p>"; return; }
+        
         favs.forEach((txt) => {
             const item = savedQuizData.find(d => d.q === txt);
-            const ansText = item ? item.a : "（データ未読込）";
+            const ansText = item ? item.a : "---";
             const yomiText = (item && item.y) ? ` (${item.y})` : "";
             const div = document.createElement('div');
             div.className = "review-item";
-            const safeTxt = txt.replace(/'/g, "\\'");
+            const hiddenClass = isAllRevealed ? "" : "hidden";
             div.innerHTML = `
                 <div class="review-q">${txt}</div>
                 <div class="review-bottom-row">
-                    <div class="rev-ans-box"><span class="rev-ans hidden">${ansText}${yomiText}</span></div>
+                    <div class="rev-ans-box"><span class="rev-ans ${hiddenClass}">${ansText}${yomiText}</span></div>
                     <div class="rev-controls">
-                        <button class="btn-sm" style="background:var(--primary); color:white;" onclick="toggleThisAns(this)">表示</button>
-                        <button class="btn-sm" style="background:var(--danger); color:white;" onclick="removeReview('${safeTxt}')">削除</button>
+                        <button class="btn-copy-sm">コピー</button>
+                        <button class="btn-sm toggle-btn" style="background:${isAllRevealed?'var(--sub)':'var(--primary)'};color:white;">${isAllRevealed?'隠す':'表示'}</button>
+                        <button class="btn-sm delete-btn" style="background:var(--danger);color:white;">削除</button>
                     </div>
-                </div>
-            `;
+                </div>`;
+            
+            div.onclick = () => toggleThisAns(div);
+            div.querySelector('.delete-btn').onclick = (e) => { e.stopPropagation(); removeReviewElement(div, txt); };
+            div.querySelector('.btn-copy-sm').onclick = (e) => { 
+                e.stopPropagation(); 
+                const fullText = `${txt} / ${ansText}${yomiText}`;
+                copyText(fullText, e.target);
+            };
             list.appendChild(div);
         });
+        syncBulkButton();
     }
 
-    function toggleThisAns(btn) {
-        const ans = btn.closest('.review-item').querySelector('.rev-ans');
+    function toggleThisAns(div) {
+        const ans = div.querySelector('.rev-ans');
+        const btn = div.querySelector('.toggle-btn');
+        if(!ans) return;
         const isHidden = ans.classList.toggle('hidden');
         btn.textContent = isHidden ? "表示" : "隠す";
         btn.style.background = isHidden ? "var(--primary)" : "var(--sub)";
     }
 
-    function removeReview(txt) {
-        saveFav(txt, false);
-        renderReview();
+    function removeReviewElement(div, txt) {
+        div.style.transform = "translateX(-100%)"; div.style.opacity = "0";
+        setTimeout(() => {
+            div.remove(); saveFav(txt, false);
+            const favs = getFavs();
+            document.getElementById('review-count').textContent = `(${favs.length})`;
+            if(favs.length === 0) { 
+                document.getElementById('review-list').innerHTML = "<p style='text-align:center;color:#999;'>空です</p>"; 
+                isAllRevealed = false; syncBulkButton(); 
+            }
+        }, 200);
     }
 
     function toggleAllReview() {
-        const items = document.querySelectorAll('.rev-ans');
-        if(items.length === 0) return;
-        const anyHidden = Array.from(items).some(i => i.classList.contains('hidden'));
-        items.forEach(i => i.classList.toggle('hidden', !anyHidden));
-        document.querySelectorAll('.rev-controls .btn-sm:first-child').forEach(b => {
-            b.textContent = anyHidden ? "隠す" : "表示";
-            b.style.background = anyHidden ? "var(--sub)" : "var(--primary)";
+        const items = document.querySelectorAll('.review-item');
+        if(!items.length) return;
+        isAllRevealed = !isAllRevealed;
+        items.forEach(div => {
+            const ans = div.querySelector('.rev-ans');
+            const btn = div.querySelector('.toggle-btn');
+            ans.classList.toggle('hidden', !isAllRevealed);
+            btn.textContent = isAllRevealed ? "隠す" : "表示";
+            btn.style.background = isAllRevealed ? "var(--sub)" : "var(--primary)";
         });
+        syncBulkButton();
     }
+    
+    function syncBulkButton() {
+        document.getElementById('bulk-toggle-btn').textContent = isAllRevealed ? "全て隠す" : "全て表示";
+    }
+
+    function moveTopToBottom() {
+        const list = document.getElementById('review-list');
+        const first = list ? list.firstElementChild : null;
+        if (!first || !first.classList.contains('review-item')) return;
+        const ans = first.querySelector('.rev-ans');
+        const btn = first.querySelector('.toggle-btn');
+        if(ans) ans.classList.add('hidden');
+        if(btn) { btn.textContent = "表示"; btn.style.background = "var(--primary)"; }
+        const txt = first.querySelector('.review-q').textContent;
+        let favs = getFavs();
+        const idx = favs.indexOf(txt);
+        if (idx !== -1) { favs.splice(idx, 1); favs.push(txt); localStorage.setItem(KEY_FAV, JSON.stringify(favs)); }
+        list.appendChild(first);
+    }
+
+    function clearSystemData() { if(confirm("全削除？")) { localStorage.clear(); location.reload(); } }
 
     function exportAppHTML() {
         let html = document.documentElement.outerHTML;
         const dataScript = `const embeddedData = ${JSON.stringify(savedQuizData)};`;
-        // 埋め込み用変数を注入
         if (html.includes('const embeddedData =')) {
             html = html.replace(/const embeddedData = \[.*\];/, dataScript);
         } else {
             html = html.replace(/let savedQuizData = \[\];/, `let savedQuizData = [];\n    ${dataScript}`);
         }
-        const blob = new Blob([html], {type: 'text/html'});
-        const a = document.createElement('a');
-        a.href = URL.createObjectURL(blob);
-        a.download = 'QuizApp_GitHubReady.html';
-        a.click();
+        const a = document.createElement('a'); a.href = URL.createObjectURL(new Blob([html], {type: 'text/html'})); a.download = 'QuizApp_v155.html'; a.click();
     }
 
-    window.onkeydown = (e) => {
-        const activeContainer = document.querySelector('.container.active');
-        const active = activeContainer ? activeContainer.id : "";
+    document.addEventListener('keydown', (e) => {
+        if (e.target.tagName === 'INPUT') return;
         if (e.key === "ArrowRight" || e.key === "ArrowLeft") {
-            const order = ["setup", "quiz", "review"];
-            let idx = order.indexOf(active.replace('screen-', ''));
-            if (e.key === "ArrowRight") idx = (idx + 1) % 3;
-            else idx = (idx - 1 + 3) % 3;
-            showScreen(order[idx]);
+            const screens = ["setup", "quiz", "review"];
+            let idx = (screens.indexOf(currentScreen) + (e.key === "ArrowRight" ? 1 : -1) + 3) % 3;
+            showScreen(screens[idx]);
             return;
         }
-        if (e.key === "Enter") {
-            e.preventDefault();
-            if (active === "screen-setup") {
-                const sBtn = document.getElementById('start-btn');
-                if(!sBtn.disabled) initQuiz();
-            } else if (active === "screen-quiz") {
-                if(!isShowing) doReveal();
-                else doNext();
-            } else if (active === "screen-review") {
-                toggleAllReview();
+        if (currentScreen === "setup") {
+            if (e.key === "Enter" && !document.getElementById('start-btn').disabled) { e.preventDefault(); initQuiz(); }
+        } else if (currentScreen === "quiz") {
+            if (e.key === "Enter") { e.preventDefault(); if(!isShowing) doReveal(); else doNext(); }
+            else if (e.key === "Shift") { e.preventDefault(); if(isShowing) toggleFav(); }
+        } else if (currentScreen === "review") {
+            if (e.key === "Enter") { e.preventDefault(); const f = document.querySelector('.review-item'); if(f) toggleThisAns(f); } 
+            else if (e.key === "Shift") { e.preventDefault(); moveTopToBottom(); } 
+            else if (e.key === "Delete" || e.key === "Backspace") {
+                e.preventDefault(); const f = document.querySelector('.review-item');
+                if(f) removeReviewElement(f, f.querySelector('.review-q').textContent);
             }
         }
-        if (e.key === "Shift") {
-            if (active === "screen-quiz" && isShowing) { toggleFav(); }
-            else if (active === "screen-review") {
-                const favs = getFavs();
-                if(favs.length > 0) removeReview(favs[0]);
-            }
-        }
-    };
+    });
 </script>
-
-</body></html>
+</body>
